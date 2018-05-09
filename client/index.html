@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8">
+        <title>clojure graphql client</title>
+        <script src="https://unpkg.com/axios/dist/axios.min.js"></script>        
+    </head>
+    <body>
+
+        <button onclick="user().query('insert', { name : 'San Dong', email : 'abc@example.com' , age : 17} )">추가</button>
+        <button onclick="side()" >테스트</button>
+        
+        <script>
+            function side(){
+                user().query('insert', { name : 'Test_Name', email : 'test_name@example.com' , age : 17} ).then(function(e) {
+                    console.log('insert', e.data.data.addUser);
+                    user().query('update', { id : (e.data.data.addUser.id - 1), name : 'Test_Name_Fix', email : 'test_name_fix@example.com', age : e.data.data.addUser.age + 1 } ).then(function(e){
+                        
+                        console.log('update', e.data.data.updateUser);
+                        var 
+                            id = e.data.data.updateUser.id;
+                        user().query('delete', { id : id } ).then(function(e) {
+                            console.log('delete user id ' + id , e.data.data.removeUser);
+                        });
+                    });
+                });
+            }
+            
+            user().query('selects').then(function(e) {
+                console.log('select users', e.data.data);
+            });
+            user().query('select', { id : 2} ).then(function(e) {
+                console.log('select user id 2', e.data.data);
+            });
+            user().query('update', { id : 2, name : "Fix_Name", email : "fix_name@example.com", age : 7 } ).then(function(e) {
+                console.log('update user id 2', e.data.data);
+            });
+
+            function user(){
+                return {
+                    selects : (payload) => `{ users{ id, name, email, age } }`,
+                    select : (payload) => `{ user(id : "${ payload.id }") { id, name, email, age } }`,
+                    insert : (payload) => `mutation{ 
+                                                addUser( name : "${ payload.name }", email : "${ payload.email }", age : ${ payload.age }){
+                                                    id,
+                                                    name,
+                                                    email,
+                                                    age
+                                                }
+                                            }`,
+                    update : (payload) => `mutation{
+                                                updateUser(id : "${ payload.id }" , name : "${payload.name }", email : "${payload.email }", age : ${payload.age } ){
+                                                    id,
+                                                    name,
+                                                    email,
+                                                    age
+                                                }
+                                            }`,
+                    delete : (payload) => `mutation{
+                                                removeUser(id : "${ payload.id }"){
+                                                    id,
+                                                    name,
+                                                    email,
+                                                    age
+                                                }
+                                            }`,
+                    url     : 'http://localhost:3000/graphql',
+                    query : query
+                };
+
+                function query(type, payload = {}) {
+                    return axios( { 
+                        method : 'POST',
+                        url : this.url,
+                        data: { 
+                            query : this[type](payload)
+                        } 
+                    });
+                }
+            }
+            
+        </script>
+    </body>
+</html>
