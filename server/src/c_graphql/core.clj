@@ -6,7 +6,7 @@
             [ring.middleware.json :as m-json]
             [ring.middleware.cors :refer [wrap-cors]]
             [graphql-clj.executor :as executor]
-            [clojure.core.match :as match]))
+            [clojure.core.match :refer [match]]))
 
 (def users [
     { :id "1" :name "John Gang", :email "gang@gmail.com" :age 14 }
@@ -26,8 +26,14 @@
                   user(id: ID): User
                   users : [User]
                   }
+  type Mutation {
+                 addUser(name: String, email: String, age: Int): User
+                 removeUser(id: ID): User
+                 updateUser(id: ID, name: String, email: String, age: Int): User
+                 }
   schema {
     query: RootQuery
+    mutation: Mutation
   }")
 
 (defn get-user [id]
@@ -38,13 +44,46 @@
 
 (defn get-users [] users)
 
+(defn add-user [name email age] {:id (inc (count users))
+                                 :name name
+                                 :email email
+                                 :age age})
+
+(defn remove-user [id] (get-user id))
+
+(defn update-user [id name email age] (let [user (get-user id)]
+                                        (assoc user 
+                                               :name name 
+                                               :email email 
+                                               :age age)))
+
 (defn resolver-fn [type-name field-name]
-  (match/match [type-name field-name]
-               ["RootQuery" "user"] (fn [context parent args] ; { user (id : "2") { id, name, email, age } }
-                                      (get-user (get args "id")))
-              ["RootQuery" "users"] (fn [context parent args] ; { users { id, name, email, age } }
-                                     (get-users))
-               :else nil))
+  (match [type-name field-name]
+         ["RootQuery" "user"] (fn [context parent args] ; { user (id : "2") { id, name, email, age } }
+                                (get-user (get args "id")))
+         ["RootQuery" "users"] (fn [context parent args] ; { users { id, name, email, age } }
+                                 (get-users))
+         ["Mutation" "addUser"] (fn [context parent args] ; mutation { addUser (name : "John Jang", email : "jang@gmil.com", age : 14) { id, name, email, age } }
+                                  (add-user (get args "name")
+                                            (get args "email")
+                                            (get args "age")))
+         ["Mutation" "removeUser"] (fn [context parent args] ; mutation { removeUser(id : "1") { id, name, email, age } }
+                                     (remove-user (get args "id")))
+         ["Mutation" "updateUser"] (fn [context parent args] ; mutation { updateUser(id : "1" , name : "John Park", email : "park@gmail.com", age : 12 ) { id, name, email, age } }
+                                     (update-user (get args "id")
+                                                  (get args "name")
+                                                  (get args "email")
+                                                  (get args "age")))
+         :else nil))
+
+
+; mutation { addUser ( name : "John Jang",
+;                      email : "jang@gamil.com", 
+;                      age : 14){
+;                                id,
+;                                name,
+;                                email,
+;                                age } }
 
 (defroutes handler
            (POST "/graphql" [query]
